@@ -13,67 +13,19 @@
         var canvas = document.querySelector("#canvasElement");
         var ctx = canvas.getContext("2d");
 
-        function reshapeData(data, width, height) {
-            // Reshape data (1D array) to 3D array
-            var reshapedData = [];
-            for (var i = 0; i < data.length; i += 4) {
-                reshapedData.push([data[i], data[i + 1], data[i + 2], data[i + 3]]);
-            }
-
-            // Calculate the side lengths of the output image
-            var aspectRatio = width / height;
-            var sideLengthX = Math.round(Math.sqrt(reshapedData.length / aspectRatio));
-            var sideLengthY = Math.round(sideLengthX / aspectRatio);
-
-            // Reshape data to 3D array
-            var reshapedData3D = [];
-            for (var i = 0; i < reshapedData.length; i += sideLengthX) {
-                reshapedData3D.push(reshapedData.slice(i, i + sideLengthX));
-            }
-
-            return reshapedData3D;
-        }
-
         function sampleCenter(data) {
-            var center = Math.floor(data.length / 2);
-            console.log("Center:", data[center][center]);           
-            return data[center][center];
-        }
-
-        function sampleCenter4(data) {
-            // Sample the center the central 4x4 pixels of the image
-            var sampledData = [];
-            var center = Math.floor(data.length / 2);
-            for (var i = center - 2; i < center + 2; i++) {
-                for (var j = center - 2; j < center + 2; j++) {
-                    sampledData.push(data[i][j]);
-                }
-            }
-
-            sampleAvg = [0, 0, 0, 0];
-            for (var i = 0; i < sampledData.length; i++) {
-                for (var j = 0; j < sampledData[i].length; j++) {
-                    sampleAvg[j] += sampledData[i][j];
-                }
-            }
-
-            for (var i = 0; i < sampleAvg.length; i++) {
-                sampleAvg[i] /= sampledData.length;
-            }
-
-            return sampleAvg;   
+            console.log("data:", data.length);
+            console.log("video:", video.videoWidth, video.videoHeight);
+            console.log("video_n:", video.videoWidth * video.videoHeight);
+            var rowlen = video.videoWidth * 4;
+            var center = rowlen * Math.floor(video.videoHeight / 2) + rowlen / 2;      
+            console.log(data.slice(center, center + 4));
+            return data.slice(center, center + 3);
         }
 
         function rescalePixel(pixel, avg) {
-            // rescale pixel so that avg is remapped to (127, 127, 127, 127)
-            // but that the min and max values stay 0 and 255
-            var rescaledPixel = [0, 0, 0, 0];
+            var rescaledPixel = [0, 0, 0];
             for (var i = 0; i < pixel.length; i++) {
-                // if (rescalePixel[i] < avg[i]) {
-                //     rescaledPixel[i] = 0 + 128 * (avg[i] - pixel[i]) / avg[i];
-                // } else {
-                //     rescaledPixel[i] = 127 + 128 * (pixel[i] - avg[i]) / 255;
-                // }
                 p = pixel[i];
                 a = avg[i];
                 if (p <= a) {
@@ -95,18 +47,6 @@
             return rescaledPixel;
         }
 
-        function unpackData(data) {
-            // Unpack 3D array to 1D array
-            var unpackedData = [];
-            for (var i = 0; i < data.length; i++) {
-                for (var j = 0; j < data[i].length; j++) {
-                    unpackedData.push(data[i][j]);
-                }
-            }
-
-            return unpackedData;
-        }
-
         if (navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(function (stream) {
@@ -123,20 +63,15 @@
                         ctx.drawImage(video, 0, 0);
                         var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         var data = imageData.data;
-                        dataArray = reshapeData(data, canvas.width, canvas.height);
-                        avg = sampleCenter(dataArray);
-
-                        console.log("Average:", avg);
-                        console.log("Pixel:", dataArray[0][0]);
-                        console.log("Rescaled pixel:", rescalePixel(dataArray[0][0], avg));
-
-                        for (var i = 0; i < dataArray.length; i++) {
-                            for (var j = 0; j < dataArray[i].length; j++) {
-                                dataArray[i][j] = rescalePixel(dataArray[i][j], avg);
-                            }
+                        avg = sampleCenter(data);
+                        for (var i = 0; i < data.length; i += 4) {
+                            pixel = data.slice(i, i + 3);
+                            rescaledPixel = rescalePixel(pixel, avg);
+                            data[i] = rescaledPixel[0];
+                            data[i + 1] = rescaledPixel[1];
+                            data[i + 2] = rescaledPixel[2];
                         }
-                        data = unpackData(dataArray);
-                        console.log("Modified imageData:", imageData);
+                        // console.log("Modified imageData:", imageData);
                         ctx.putImageData(imageData, 0, 0);
                     }
                     requestAnimationFrame(drawFrame);
